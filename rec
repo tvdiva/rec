@@ -1,0 +1,88 @@
+#!/bin/bash
+
+# $1 - Название записи
+# $2 - Продолжительность записи в минутах
+
+# Получение переменных из файла
+source rec.rc
+
+RecName="$1"
+RecTime="$2"
+Url=""
+Fpm=1
+Folder=""
+CopyTo=""
+MoveTo=""
+Scr=""
+NoScreen="0"
+
+NumArgs=$#
+for ((i=1 ; i <= NumArgs ; i++))
+  do
+        case "$1" in
+          --url)                Url="$2";;
+          --fpm)                Fpm="--fpm $2";;
+          --folder)             Folder="$2";;
+          --copy-to)    CopyTo="$2";;
+          --move-to)    MoveTo="$2";;
+          --scr)                Scr="$2";;
+          --no-screen)  NoScreen="1";;
+        esac
+        shift
+  done
+
+if [[ "$Folder" != "" ]]
+  then
+        Folder="/$Folder"
+        mkdir -p "$RecFolder$Folder"
+  fi
+
+# Текущее время
+CurrentTimeSec=$(date +%s)
+# Время начала записи в секундах
+StartTimeSec=$CurrentTimeSec
+# Продолжительность записи в секундах + "хвост" в 40 секунд
+RecTimeSec=$[$RecTime*60+$AddTime]
+# Время окончания записи в секундах
+EndTimeSec=$[$StartTimeSec+$RecTimeSec]
+# let "EndTimeSec=$StartTimeSec+$RecTimeSec"
+
+# В случае обрыва записи, продолжать, пока не достигнуто время оконания записи
+while [ $CurrentTimeSec -le $EndTimeSec ]
+  do
+# штамп текущего времени для добавления к имени записываемого файла
+        NowStamp=$(date +%y%m%d-%H%M%S)
+# Полное имя записываемого файла
+        RecFile="$RecFolder$Folder/$RecName-$NowStamp.ts"
+# Вычисление времени записи до окончания записи
+        RecTimeSec=$[$EndTimeSec-$CurrentTimeSec]
+        StampStart="--stampStart "$(date +%H:%M:%S)
+        if [[ "$Scr" != "" ]]
+          then
+                Url=$($Scr)
+          fi
+# Команда записи
+        ffmpeg -nostdin -v 0 -y -i $Url -bufsize 8m -t $RecTimeSec -metadata comment="FlowRecord" -c copy "$RecFile"  &>/dev/null
+        RecFileSize=$(stat -c%s "$RecFile")
+# Если записанный файл меньше $SizeLimit, то он считается испорченным и удаляется
+        if [ "$RecFileSize" -lt $SizeLimit ]
+          then
+                unlink "$RecFile"
+          fi
+        if [ -e "$RecFile" ]
+          then
+# RecFile=$1
+# RecFolder=$2
+# Folder=$3
+# Fpm=$4
+# CopyTo=$5
+# MoveTo=$6
+# StampStart=$7
+# NoScreen=$8
+                nohup $ScriptFolder/rec-after-file "$RecFile" "$RecFolder" "$Folder" "$Fpm" "$CopyTo" "$MoveTo" "$StampStart" $NoScreen &
+          fi
+# Пауза
+        sleep 1
+# Получение текущего времени для последующего его сравнения со временем окончания записи при следующем цикле
+        CurrentTimeSec=$(date +%s)
+  done
