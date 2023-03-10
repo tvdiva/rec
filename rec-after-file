@@ -1,0 +1,30 @@
+#!/bin/bash
+
+RecFile=$1
+RecFolder=$2
+Folder=$3
+Fpm=$4
+CopyTo=$5
+MoveTo=$6
+StampStart=$7
+NoScreen=$8
+
+if [[ "$NoScreen" = "0" ]]
+  then
+        while pgrep screengen > /dev/null; do sleep 5; done
+        screengen "$RecFile" --preset capture --outFolder "$RecFolder$Folder" $Fpm $StampStart 2>&1 &>> /dev/null
+  fi
+
+if [[ "$CopyTo" != "" ]]
+  then
+    mkdir -p "$CopyTo"
+    test -e "$RecFile" && cp "$RecFile" "${CopyTo}/"
+    test -e "${RecFile}.jpg" && cp "${RecFile}.jpg" "${CopyTo}/"
+  fi
+
+if [[ "$MoveTo" != "" ]]
+  then
+        mkdir -p "$MoveTo"
+        test -e "$RecFile" && mv "$RecFile" "${MoveTo}/"
+        test -e "${RecFile}.jpg" && mv "${RecFile}.jpg" "${MoveTo}/"
+  fi
